@@ -1,1 +1,7 @@
-app/src/main/res/values/colors.xml
+<resources>
+    <color name="zazen_background">#101411</color>
+    <color name="zazen_surface">#1A221D</color>
+    <color name="zazen_primary">#B9F6CA</color>
+    <color name="zazen_secondary">#A7F3D0</color>
+    <color name="zazen_text">#EAFBEF</color>
+</resources>
