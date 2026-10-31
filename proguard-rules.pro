@@ -1,1 +1,1 @@
--rules.pro
+# ProGuard rules for the zazen timer app
