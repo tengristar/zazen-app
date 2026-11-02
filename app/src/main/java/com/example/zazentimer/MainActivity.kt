@@ -26,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.zazentimer.ui.theme.ZazenTheme
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -49,31 +49,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            ZazenTimerApp()
+            ZazenTheme {
+                ZazenTimerApp()
+            }
         }
     }
 }
 
-private val DarkColors = darkColorScheme(
-    primary = Color(0xFFB9F6CA),
-    secondary = Color(0xFFA7F3D0),
-    tertiary = Color(0xFF7AD7F0),
-    background = Color(0xFF101411),
-    surface = Color(0xFF1A221D),
-    surfaceVariant = Color(0xFF2A352F),
-    onBackground = Color(0xFFEAFBEF),
-    onSurface = Color(0xFFEAFBEF),
-    onSurfaceVariant = Color(0xFFC7D9CF)
-)
-
 @Composable
 fun ZazenTimerApp() {
-    MaterialTheme(
-        colorScheme = DarkColors,
-        content = {
-            ZazenTimerScreen()
-        }
-    )
+    ZazenTheme {
+        ZazenTimerScreen()
+    }
 }
 
 data class SessionPreset(val label: String, val minutes: Int)
@@ -149,6 +136,12 @@ fun ZazenTimerScreen() {
                     style = MaterialTheme.typography.headlineLarge.copy(fontSize = 38.sp),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Text(
+                    text = "by tengristar",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
                 )
 
                 Text(
