@@ -132,7 +132,7 @@ fun ZazenTimerScreen() {
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 Text(
-                    text = "Zazen",
+                    text = "ZA-ZEN TIMER",
                     style = MaterialTheme.typography.headlineLarge.copy(fontSize = 38.sp),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
