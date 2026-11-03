@@ -2,6 +2,7 @@ package com.example.zazentimer.ui
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -37,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -100,42 +103,38 @@ fun ZazenTimerScreen() {
     )
     val selectedDayRecords = history.filter { sameDay(it.timestamp, selectedDay) }
     val totalMinutes = history.sumOf { it.minutes }
+    val pageGradient = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.background,
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+            MaterialTheme.colorScheme.background
+        )
+    )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
-                    )
-                )
-            )
-    ) {
+    Box(Modifier.fillMaxSize().background(pageGradient)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(
-                    text = "ZA-ZEN",
-                    style = MaterialTheme.typography.labelLarge,
+                    text = "ZA-ZEN  ·  DAILY PRACTICE",
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    letterSpacing = 3.sp,
+                    letterSpacing = 2.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "A quiet moment",
+                    text = "Return to stillness.",
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = "Make space to breathe.",
+                    text = "A little quiet can change the shape of your day.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -143,69 +142,75 @@ fun ZazenTimerScreen() {
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(30.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     Text(
                         text = when {
-                            isRunning -> "IN SESSION"
+                            isRunning -> "BREATHE · BE HERE"
                             remainingSeconds == 0 -> "SESSION COMPLETE"
-                            else -> "READY WHEN YOU ARE"
+                            else -> "YOUR MOMENT"
                         },
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = 1.5.sp
+                        letterSpacing = 1.8.sp
                     )
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(220.dp)) {
+
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(224.dp)) {
                         CircularProgressIndicator(
                             progress = { progress },
                             modifier = Modifier.fillMaxSize(),
-                            strokeWidth = 8.dp,
+                            strokeWidth = 7.dp,
                             color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
                         )
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = formatDuration(remainingSeconds),
-                                style = MaterialTheme.typography.displaySmall.copy(fontSize = 46.sp),
+                                style = MaterialTheme.typography.displaySmall.copy(fontSize = 48.sp),
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Light
                             )
+                            Spacer(Modifier.height(2.dp))
                             Text(
-                                text = "remaining",
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = if (isRunning) "remaining" else "minutes · seconds",
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        sessionPresets.forEach { preset ->
-                            val selected = preset.minutes == selectedMinutes
-                            if (selected) {
-                                Button(
-                                    onClick = { if (!isRunning) setPreset(preset.minutes) { selectedMinutes = it; remainingSeconds = it * 60 } },
-                                    shape = RoundedCornerShape(14.dp),
-                                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding
-                                ) { Text(preset.label) }
-                            } else {
-                                OutlinedButton(
+                        Text(
+                            text = "SESSION LENGTH",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            letterSpacing = 1.2.sp
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            sessionPresets.forEach { preset ->
+                                FilterChip(
+                                    selected = preset.minutes == selectedMinutes,
                                     onClick = {
-                                        isRunning = false
-                                        selectedMinutes = preset.minutes
-                                        remainingSeconds = preset.minutes * 60
+                                        if (!isRunning) {
+                                            selectedMinutes = preset.minutes
+                                            remainingSeconds = preset.minutes * 60
+                                        }
                                     },
-                                    shape = RoundedCornerShape(14.dp)
-                                ) { Text(preset.label) }
+                                    label = { Text(preset.label) }
+                                )
                             }
                         }
                     }
@@ -219,17 +224,18 @@ fun ZazenTimerScreen() {
                                 if (remainingSeconds == 0) remainingSeconds = selectedMinutes * 60
                                 isRunning = !isRunning
                             },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(16.dp)
+                            modifier = Modifier.weight(1f).height(54.dp),
+                            shape = RoundedCornerShape(17.dp)
                         ) {
-                            Text(if (isRunning) "Pause" else "Begin session")
+                            Text(if (isRunning) "Pause" else "Begin session", fontWeight = FontWeight.SemiBold)
                         }
                         OutlinedButton(
                             onClick = {
                                 isRunning = false
                                 remainingSeconds = selectedMinutes * 60
                             },
-                            shape = RoundedCornerShape(16.dp)
+                            modifier = Modifier.height(54.dp),
+                            shape = RoundedCornerShape(17.dp)
                         ) { Text("Reset") }
                     }
                 }
@@ -237,14 +243,14 @@ fun ZazenTimerScreen() {
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    SectionHeading(title = "Your practice", subtitle = "A little consistency goes a long way")
+                    SectionHeading("Your practice", "Every session is a small return")
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         StatCard("Sessions", history.size.toString(), Modifier.weight(1f))
                         StatCard("Minutes", totalMinutes.toString(), Modifier.weight(1f))
@@ -254,14 +260,14 @@ fun ZazenTimerScreen() {
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    SectionHeading(title = "Closing sound", subtitle = "Choose a gentle end-of-session cue")
+                    SectionHeading("Closing sound", "A gentle cue when your session ends")
                     GongPicker(
                         selected = selectedGong,
                         onSelect = { mode ->
@@ -274,22 +280,21 @@ fun ZazenTimerScreen() {
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    SectionHeading(title = "Meditation history", subtitle = "Tap a day to revisit your practice")
+                    SectionHeading("Meditation history", "Tap a date to see your sessions")
                     CalendarHistoryCard(
                         history = history,
                         monthStart = monthStart,
                         selectedDay = selectedDay,
                         onMonthChange = { offset ->
                             monthStart = addMonths(monthStart, offset)
-                            val firstDay = startOfMonth(monthStart)
-                            selectedDay = firstDay
+                            selectedDay = startOfMonth(monthStart)
                         },
                         onDaySelected = { selectedDay = startOfDay(it) }
                     )
@@ -309,7 +314,7 @@ fun ZazenTimerScreen() {
                         selectedDayRecords.sortedByDescending { it.timestamp }.forEach { record ->
                             val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(record.timestamp)
                             Text(
-                                text = "${record.minutes} min · $time",
+                                text = "${record.minutes} min  ·  $time",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -334,12 +339,12 @@ private fun SectionHeading(title: String, subtitle: String) {
 private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        shape = RoundedCornerShape(17.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 14.dp, horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            modifier = Modifier.padding(vertical = 15.dp, horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -355,8 +360,10 @@ private fun CalendarHistoryCard(
     onMonthChange: (Int) -> Unit,
     onDaySelected: (Long) -> Unit
 ) {
-    val month = Calendar.getInstance().apply { timeInMillis = monthStart }
-    val first = (month.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1) }
+    val first = Calendar.getInstance().apply {
+        timeInMillis = monthStart
+        set(Calendar.DAY_OF_MONTH, 1)
+    }
     val monthLabel = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(first.time)
     val weekdays = listOf("S", "M", "T", "W", "T", "F", "S")
     val leading = first.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY
@@ -372,7 +379,7 @@ private fun CalendarHistoryCard(
         Text(monthLabel, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         OutlinedButton(onClick = { onMonthChange(1) }, shape = CircleShape) { Text("›") }
     }
-    Row(modifier = Modifier.fillMaxWidth()) {
+    Row(Modifier.fillMaxWidth()) {
         weekdays.forEach { weekday ->
             Text(
                 text = weekday,
@@ -384,7 +391,7 @@ private fun CalendarHistoryCard(
         }
     }
     repeat(6) { week ->
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth()) {
             repeat(7) { weekday ->
                 val dayNumber = week * 7 + weekday - leading + 1
                 if (dayNumber !in 1..daysInMonth) {
@@ -394,19 +401,18 @@ private fun CalendarHistoryCard(
                     val timestamp = day.timeInMillis
                     val selected = sameDay(timestamp, selectedDay)
                     val completed = dayKey(timestamp) in sessionDays
-                    Box(modifier = Modifier.weight(1f).height(42.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.weight(1f).height(42.dp), contentAlignment = Alignment.Center) {
                         Surface(
-                            onClick = { onDaySelected(timestamp) },
-                            modifier = Modifier.size(38.dp),
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clickable(role = Role.Button) { onDaySelected(timestamp) },
                             shape = RoundedCornerShape(13.dp),
-                            color = when {
-                                selected -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                            }
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
-                                    dayNumber.toString(),
+                                    text = dayNumber.toString(),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                                 )
@@ -414,8 +420,8 @@ private fun CalendarHistoryCard(
                                     Box(
                                         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp)
                                             .size(4.dp).background(
-                                                if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                                                CircleShape
+                                                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                                shape = CircleShape
                                             )
                                     )
                                 }
@@ -427,8 +433,6 @@ private fun CalendarHistoryCard(
         }
     }
 }
-
-private fun setPreset(minutes: Int, update: (Int) -> Unit) = update(minutes)
 
 private fun formatDuration(totalSeconds: Int): String =
     String.format(Locale.getDefault(), "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
