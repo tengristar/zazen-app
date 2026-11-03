@@ -2,19 +2,25 @@ package com.example.zazentimer.ui
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -31,11 +37,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.example.zazentimer.data.MeditationStore
 import com.example.zazentimer.model.GongMode
 import com.example.zazentimer.model.MeditationRecord
@@ -45,251 +51,265 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
+private val sessionPresets = listOf(
+    SessionPreset("5 min", 5),
+    SessionPreset("10 min", 10),
+    SessionPreset("15 min", 15),
+    SessionPreset("20 min", 20),
+    SessionPreset("30 min", 30),
+    SessionPreset("45 min", 45)
+)
+
 @Composable
 fun ZazenTimerScreen() {
     val context = LocalContext.current
     val store = remember { MeditationStore(context) }
-
-    val presets = listOf(
-        SessionPreset("5 min", 5),
-        SessionPreset("10 min", 10),
-        SessionPreset("15 min", 15),
-        SessionPreset("20 min", 20),
-        SessionPreset("30 min", 30),
-        SessionPreset("45 min", 45)
-    )
-
     var selectedMinutes by remember { mutableIntStateOf(20) }
-    var remainingSeconds by remember { mutableIntStateOf(selectedMinutes * 60) }
+    var remainingSeconds by remember { mutableIntStateOf(20 * 60) }
     var isRunning by remember { mutableStateOf(false) }
     var selectedGong by remember { mutableStateOf(store.loadGong()) }
     var history by remember { mutableStateOf(store.loadHistory()) }
-    var currentMonthStart by remember { mutableLongStateOf(startOfMonth(System.currentTimeMillis())) }
+    var monthStart by remember { mutableLongStateOf(startOfMonth(System.currentTimeMillis())) }
     var selectedDay by remember { mutableLongStateOf(startOfDay(System.currentTimeMillis())) }
 
     LaunchedEffect(selectedGong) { store.saveGong(selectedGong) }
     LaunchedEffect(history) { store.saveHistory(history) }
 
-    val totalSessions = history.size
-    val totalMinutes = history.sumOf { it.minutes }
-    val selectedDayRecords = history.filter { sameDay(it.timestamp, selectedDay) }
-
-    val totalSeconds = selectedMinutes * 60
-    val elapsedRatio = if (totalSeconds == 0) 0f else 1f - (remainingSeconds.toFloat() / totalSeconds.toFloat())
-    val animatedProgress by animateFloatAsState(
-        targetValue = elapsedRatio.coerceIn(0f, 1f),
-        label = "timerProgress"
-    )
-
     LaunchedEffect(isRunning, remainingSeconds) {
-        if (isRunning && remainingSeconds > 0) {
-            delay(1000L)
-            remainingSeconds -= 1
-        } else if (isRunning && remainingSeconds == 0) {
+        if (!isRunning) return@LaunchedEffect
+        if (remainingSeconds > 0) {
+            delay(1_000L)
+            remainingSeconds = (remainingSeconds - 1).coerceAtLeast(0)
+        } else {
             isRunning = false
-            val completion = MeditationRecord(
-                timestamp = System.currentTimeMillis(),
+            val completedAt = System.currentTimeMillis()
+            history = history + MeditationRecord(
+                timestamp = completedAt,
                 minutes = selectedMinutes,
                 presetLabel = "$selectedMinutes min"
             )
-            history = history + completion
-            selectedDay = startOfDay(completion.timestamp)
-            currentMonthStart = startOfMonth(completion.timestamp)
+            selectedDay = startOfDay(completedAt)
+            monthStart = startOfMonth(completedAt)
             store.playSelectedGong(selectedGong)
         }
     }
 
-    val timerLabel = when {
-        remainingSeconds == 0 -> "Session complete"
-        isRunning -> "Meditating"
-        else -> "Ready"
-    }
+    val progress by animateFloatAsState(
+        targetValue = (1f - remainingSeconds.toFloat() / (selectedMinutes * 60f)).coerceIn(0f, 1f),
+        label = "sessionProgress"
+    )
+    val selectedDayRecords = history.filter { sameDay(it.timestamp, selectedDay) }
+    val totalMinutes = history.sumOf { it.minutes }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
+                    )
+                )
+            )
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.background,
-                            MaterialTheme.colorScheme.surface
-                        )
-                    )
-                )
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Column(
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "ZA-ZEN",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    letterSpacing = 3.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "A quiet moment",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "Make space to breathe.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Card(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Text(
-                    text = "ZA-ZEN TIMER",
-                    style = MaterialTheme.typography.headlineLarge.copy(fontSize = 38.sp),
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-
-                Text(
-                    text = "by tengristar",
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-                )
-
-                Text(
-                    text = timerLabel,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(260.dp)) {
-                    CircularProgressIndicator(
-                        progress = { animatedProgress },
-                        modifier = Modifier.size(260.dp),
-                        strokeWidth = 18.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                    )
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = formatDuration(remainingSeconds),
-                            style = MaterialTheme.typography.displaySmall.copy(fontSize = 42.sp),
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            text = "remaining",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    presets.forEach { preset ->
-                        val isSelected = preset.minutes == selectedMinutes
-                        OutlinedButton(
-                            onClick = {
-                                selectedMinutes = preset.minutes
-                                remainingSeconds = preset.minutes * 60
-                                isRunning = false
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surface,
-                                contentColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                        ) {
-                            Text(preset.label)
-                        }
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = {
-                            if (remainingSeconds == 0) {
-                                remainingSeconds = selectedMinutes * 60
-                            }
-                            isRunning = !isRunning
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Text(if (isRunning) "Pause" else "Start")
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            isRunning = false
-                            remainingSeconds = selectedMinutes * 60
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Text("Reset")
-                    }
-                }
-
-                GongPicker(
-                    selected = selectedGong,
-                    onSelect = { mode ->
-                        selectedGong = mode
-                        if (mode != GongMode.NONE) {
-                            store.playSelectedGong(mode)
-                        }
-                    }
-                )
-
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
                     Text(
-                        text = "Stats",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground
+                        text = when {
+                            isRunning -> "IN SESSION"
+                            remainingSeconds == 0 -> "SESSION COMPLETE"
+                            else -> "READY WHEN YOU ARE"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 1.5.sp
                     )
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(220.dp)) {
+                        CircularProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.fillMaxSize(),
+                            strokeWidth = 8.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = formatDuration(remainingSeconds),
+                                style = MaterialTheme.typography.displaySmall.copy(fontSize = 46.sp),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Light
+                            )
+                            Text(
+                                text = "remaining",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        StatBox(label = "Sessions", value = totalSessions.toString())
-                        StatBox(label = "Minutes", value = totalMinutes.toString())
+                        sessionPresets.forEach { preset ->
+                            val selected = preset.minutes == selectedMinutes
+                            if (selected) {
+                                Button(
+                                    onClick = { if (!isRunning) setPreset(preset.minutes) { selectedMinutes = it; remainingSeconds = it * 60 } },
+                                    shape = RoundedCornerShape(14.dp),
+                                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                                ) { Text(preset.label) }
+                            } else {
+                                OutlinedButton(
+                                    onClick = {
+                                        isRunning = false
+                                        selectedMinutes = preset.minutes
+                                        remainingSeconds = preset.minutes * 60
+                                    },
+                                    shape = RoundedCornerShape(14.dp)
+                                ) { Text(preset.label) }
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                if (remainingSeconds == 0) remainingSeconds = selectedMinutes * 60
+                                isRunning = !isRunning
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text(if (isRunning) "Pause" else "Begin session")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                isRunning = false
+                                remainingSeconds = selectedMinutes * 60
+                            },
+                            shape = RoundedCornerShape(16.dp)
+                        ) { Text("Reset") }
                     }
                 }
+            }
 
-                val monthCalendar = Calendar.getInstance().apply { timeInMillis = currentMonthStart }
-                CalendarHistoryCard(
-                    history = history,
-                    month = monthCalendar,
-                    selectedDay = Calendar.getInstance().apply { timeInMillis = selectedDay },
-                    onMonthChange = { delta ->
-                        currentMonthStart = addMonths(currentMonthStart, delta)
-                        val cal = Calendar.getInstance().apply { timeInMillis = currentMonthStart }
-                        cal.set(Calendar.DAY_OF_MONTH, 1)
-                        selectedDay = cal.timeInMillis
-                    },
-                    onDaySelected = { day -> selectedDay = day.timeInMillis }
-                )
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    SectionHeading(title = "Your practice", subtitle = "A little consistency goes a long way")
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatCard("Sessions", history.size.toString(), Modifier.weight(1f))
+                        StatCard("Minutes", totalMinutes.toString(), Modifier.weight(1f))
+                    }
+                }
+            }
 
-                if (selectedDayRecords.isEmpty()) {
-                    Text(
-                        text = "No sessions recorded for this day.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    SectionHeading(title = "Closing sound", subtitle = "Choose a gentle end-of-session cue")
+                    GongPicker(
+                        selected = selectedGong,
+                        onSelect = { mode ->
+                            selectedGong = mode
+                            if (mode != GongMode.NONE) store.playSelectedGong(mode)
+                        }
                     )
-                } else {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    SectionHeading(title = "Meditation history", subtitle = "Tap a day to revisit your practice")
+                    CalendarHistoryCard(
+                        history = history,
+                        monthStart = monthStart,
+                        selectedDay = selectedDay,
+                        onMonthChange = { offset ->
+                            monthStart = addMonths(monthStart, offset)
+                            val firstDay = startOfMonth(monthStart)
+                            selectedDay = firstDay
+                        },
+                        onDaySelected = { selectedDay = startOfDay(it) }
+                    )
+                    if (selectedDayRecords.isEmpty()) {
+                        Text(
+                            text = "No sessions on ${formatShortDate(selectedDay)}.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
                         Text(
                             text = formatLongDate(selectedDay),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onBackground
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold
                         )
                         selectedDayRecords.sortedByDescending { it.timestamp }.forEach { record ->
-                            val timeText = SimpleDateFormat("HH:mm", Locale.getDefault()).format(record.timestamp)
+                            val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(record.timestamp)
                             Text(
-                                text = "• ${record.minutes} min at $timeText",
+                                text = "${record.minutes} min · $time",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -297,35 +317,32 @@ fun ZazenTimerScreen() {
                     }
                 }
             }
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
 
 @Composable
-private fun StatBox(label: String, value: String) {
+private fun SectionHeading(title: String, subtitle: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
     Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
-        modifier = Modifier
-            .weight(1f)
-            .padding(horizontal = 4.dp)
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(vertical = 14.dp, horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -333,83 +350,74 @@ private fun StatBox(label: String, value: String) {
 @Composable
 private fun CalendarHistoryCard(
     history: List<MeditationRecord>,
-    month: Calendar,
-    selectedDay: Calendar,
+    monthStart: Long,
+    selectedDay: Long,
     onMonthChange: (Int) -> Unit,
-    onDaySelected: (Calendar) -> Unit
+    onDaySelected: (Long) -> Unit
 ) {
-    val monthLabel = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(month.time)
-    val weekdays = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+    val month = Calendar.getInstance().apply { timeInMillis = monthStart }
     val first = (month.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1) }
-    val leadingDays = first.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY
+    val monthLabel = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(first.time)
+    val weekdays = listOf("S", "M", "T", "W", "T", "F", "S")
+    val leading = first.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY
     val daysInMonth = first.getActualMaximum(Calendar.DAY_OF_MONTH)
     val sessionDays = history.map { dayKey(it.timestamp) }.toSet()
 
-    Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Button(onClick = { onMonthChange(-1) }) { Text("‹") }
-                Text(monthLabel, style = MaterialTheme.typography.titleMedium)
-                Button(onClick = { onMonthChange(1) }) { Text("›") }
-            }
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-                weekdays.forEach { weekday ->
-                    Text(
-                        text = weekday,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            repeat(6) { week ->
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    repeat(7) { weekday ->
-                        val dayNumber = week * 7 + weekday - leadingDays + 1
-                        if (dayNumber !in 1..daysInMonth) {
-                            Box(Modifier.weight(1f).height(42.dp))
-                        } else {
-                            val day = (first.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, dayNumber) }
-                            val hasSession = dayKey(day.timeInMillis) in sessionDays
-                            val isSelected = sameDay(day.timeInMillis, selectedDay.timeInMillis)
-
-                            Button(
-                                onClick = { onDaySelected(day) },
-                                modifier = Modifier.weight(1f).height(42.dp).padding(2.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+        OutlinedButton(onClick = { onMonthChange(-1) }, shape = CircleShape) { Text("‹") }
+        Text(monthLabel, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        OutlinedButton(onClick = { onMonthChange(1) }, shape = CircleShape) { Text("›") }
+    }
+    Row(modifier = Modifier.fillMaxWidth()) {
+        weekdays.forEach { weekday ->
+            Text(
+                text = weekday,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+    repeat(6) { week ->
+        Row(modifier = Modifier.fillMaxWidth()) {
+            repeat(7) { weekday ->
+                val dayNumber = week * 7 + weekday - leading + 1
+                if (dayNumber !in 1..daysInMonth) {
+                    Box(Modifier.weight(1f).height(42.dp))
+                } else {
+                    val day = (first.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, dayNumber) }
+                    val timestamp = day.timeInMillis
+                    val selected = sameDay(timestamp, selectedDay)
+                    val completed = dayKey(timestamp) in sessionDays
+                    Box(modifier = Modifier.weight(1f).height(42.dp), contentAlignment = Alignment.Center) {
+                        Surface(
+                            onClick = { onDaySelected(timestamp) },
+                            modifier = Modifier.size(38.dp),
+                            shape = RoundedCornerShape(13.dp),
+                            color = when {
+                                selected -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                            }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    dayNumber.toString(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                                 )
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(dayNumber.toString())
-                                    if (hasSession) {
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.BottomCenter)
-                                                .padding(bottom = 1.dp)
-                                                .size(4.dp)
-                                                .background(
-                                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                                                    shape = CircleShape
-                                                )
-                                        )
-                                    }
+                                if (completed) {
+                                    Box(
+                                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp)
+                                            .size(4.dp).background(
+                                                if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                                CircleShape
+                                            )
+                                    )
                                 }
                             }
                         }
@@ -420,46 +428,44 @@ private fun CalendarHistoryCard(
     }
 }
 
-private fun formatDuration(totalSeconds: Int): String {
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
-}
+private fun setPreset(minutes: Int, update: (Int) -> Unit) = update(minutes)
 
-private fun formatLongDate(timestamp: Long): String {
-    return SimpleDateFormat("EEEE, d. MMMM yyyy", Locale.getDefault()).format(timestamp)
-}
+private fun formatDuration(totalSeconds: Int): String =
+    String.format(Locale.getDefault(), "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
 
-private fun startOfDay(timestamp: Long): Long {
-    val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
-    cal.set(Calendar.HOUR_OF_DAY, 0)
-    cal.set(Calendar.MINUTE, 0)
-    cal.set(Calendar.SECOND, 0)
-    cal.set(Calendar.MILLISECOND, 0)
-    return cal.timeInMillis
-}
+private fun formatLongDate(timestamp: Long): String =
+    SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(timestamp)
 
-private fun startOfMonth(timestamp: Long): Long {
-    val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
-    cal.set(Calendar.DAY_OF_MONTH, 1)
-    cal.set(Calendar.HOUR_OF_DAY, 0)
-    cal.set(Calendar.MINUTE, 0)
-    cal.set(Calendar.SECOND, 0)
-    cal.set(Calendar.MILLISECOND, 0)
-    return cal.timeInMillis
-}
+private fun formatShortDate(timestamp: Long): String =
+    SimpleDateFormat("d MMMM", Locale.getDefault()).format(timestamp)
 
-private fun addMonths(timestamp: Long, months: Int): Long {
-    val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
-    cal.add(Calendar.MONTH, months)
-    return cal.timeInMillis
-}
+private fun startOfDay(timestamp: Long): Long = Calendar.getInstance().apply {
+    timeInMillis = timestamp
+    set(Calendar.HOUR_OF_DAY, 0)
+    set(Calendar.MINUTE, 0)
+    set(Calendar.SECOND, 0)
+    set(Calendar.MILLISECOND, 0)
+}.timeInMillis
+
+private fun startOfMonth(timestamp: Long): Long = Calendar.getInstance().apply {
+    timeInMillis = timestamp
+    set(Calendar.DAY_OF_MONTH, 1)
+    set(Calendar.HOUR_OF_DAY, 0)
+    set(Calendar.MINUTE, 0)
+    set(Calendar.SECOND, 0)
+    set(Calendar.MILLISECOND, 0)
+}.timeInMillis
+
+private fun addMonths(timestamp: Long, delta: Int): Long = Calendar.getInstance().apply {
+    timeInMillis = timestamp
+    add(Calendar.MONTH, delta)
+    set(Calendar.DAY_OF_MONTH, 1)
+}.timeInMillis
 
 private fun sameDay(first: Long, second: Long): Boolean {
     val a = Calendar.getInstance().apply { timeInMillis = first }
     val b = Calendar.getInstance().apply { timeInMillis = second }
-    return a.get(Calendar.YEAR) == b.get(Calendar.YEAR) &&
-        a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
+    return a.get(Calendar.YEAR) == b.get(Calendar.YEAR) && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
 }
 
 private fun dayKey(timestamp: Long): String =
